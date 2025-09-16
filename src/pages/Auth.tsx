@@ -13,79 +13,128 @@ import {
 const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [aadharNumber, setAadharNumber] = useState("");
+  const [mobile, setMobile] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Step 1: Send OTP
   const handleSendOtp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (aadharNumber.length !== 12) {
+    if (aadharNumber.replace(/\D/g, "").length !== 12) {
       toast({
-        title: "Invalid Aadhaar Number",
-        description: "Please enter a valid 12-digit Aadhaar number",
+        title: "Invalid Aadhaar",
+        description: "Enter 12-digit Aadhaar",
         variant: "destructive",
       });
       return;
     }
-    setIsLoading(true);
-    // Simulate sending OTP (in real app, call backend)
-    setTimeout(() => {
-      setIsLoading(false);
-      setOtpSent(true);
+    if (!/^\d{10}$/.test(mobile)) {
       toast({
-        title: "OTP Sent",
-        description:
-          "OTP has been sent to your registered mobile number (mock: check backend console)",
+        title: "Invalid Mobile",
+        description: "Enter 10-digit mobile",
+        variant: "destructive",
       });
-    }, 1000);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await fetch(
+        "http://localhost:4000/api/aadhaar/initiate",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ aadhaarNumber: aadharNumber, mobile }),
+        }
+      );
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setOtpSent(true);
+        toast({
+          title: "OTP Sent",
+          description:
+            "Check backend console or your SMS if configured.",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: data?.message || "Failed to send OTP",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "Network Error",
+        description: "Cannot reach backend",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Step 2: Verify OTP and Login
   const handleVerifyOtp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (otp.length !== 6) {
+    if (otp.replace(/\D/g, "").length !== 6) {
       toast({
         title: "Invalid OTP",
-        description: "Please enter the 6-digit OTP",
+        description: "Enter 6-digit OTP",
         variant: "destructive",
       });
       return;
     }
     setIsLoading(true);
-    // Simulate OTP verification (in real app, call backend)
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const res = await fetch(
+        "http://localhost:4000/api/aadhaar/verify",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ aadhaarNumber: aadharNumber, otp }),
+        }
+      );
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast({ title: "Login Successful", description: "Redirecting..." });
+        localStorage.setItem("auth", "true");
+        navigate("/dashboard");
+      } else {
+        toast({
+          title: "Verification Failed",
+          description: data?.message || "Invalid OTP",
+          variant: "destructive",
+        });
+      }
+    } catch {
       toast({
-        title: "Login Successful",
-        description: "You are now logged in",
+        title: "Network Error",
+        description: "Cannot reach backend",
+        variant: "destructive",
       });
-      localStorage.setItem("auth", "true");
-      navigate("/dashboard");
-    }, 1000);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-secondary/20 flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-primary to-primary-hover rounded-full mb-4 shadow-lg">
-            <Shield className="w-8 h-8 text-primary-foreground" />
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 shadow">
+            <Shield className="w-8 h-8" />
           </div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">
-            SecureVote
-          </h1>
-          <p className="text-muted-foreground">
-            Blockchain-powered voting portal
+          <h1 className="text-2xl font-bold">SecureVote</h1>
+          <p className="text-sm text-muted-foreground">
+            Login with Aadhaar + OTP
           </p>
         </div>
 
-        <Card className="shadow-xl border-0 bg-card/95 backdrop-blur-sm">
-          <CardHeader className="text-center">
+        <Card>
+          <CardHeader>
             <CardTitle>Login with Aadhaar</CardTitle>
             <CardDescription>
-              Enter your Aadhaar number to receive OTP
+              Enter Aadhaar and mobile to receive OTP
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -93,12 +142,23 @@ const Auth = () => {
               <form onSubmit={handleSendOtp} className="space-y-4">
                 <input
                   type="text"
-                  placeholder="Enter 12-digit Aadhaar Number"
+                  placeholder="12-digit Aadhaar"
                   value={aadharNumber}
                   onChange={(e) =>
-                    setAadharNumber(e.target.value.replace(/\D/, ""))
+                    setAadharNumber(e.target.value.replace(/\D/g, ""))
                   }
                   maxLength={12}
+                  className="w-full px-3 py-2 border rounded"
+                  disabled={isLoading}
+                />
+                <input
+                  type="text"
+                  placeholder="10-digit Mobile"
+                  value={mobile}
+                  onChange={(e) =>
+                    setMobile(e.target.value.replace(/\D/g, ""))
+                  }
+                  maxLength={10}
                   className="w-full px-3 py-2 border rounded"
                   disabled={isLoading}
                 />
@@ -112,33 +172,41 @@ const Auth = () => {
               </form>
             ) : (
               <form onSubmit={handleVerifyOtp} className="space-y-4">
+                <div className="text-sm">OTP sent to +91{mobile}</div>
                 <input
                   type="text"
-                  placeholder="Enter 6-digit OTP"
+                  placeholder="6-digit OTP"
                   value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/, ""))}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
                   maxLength={6}
                   className="w-full px-3 py-2 border rounded"
                   disabled={isLoading}
                 />
-                <button
-                  type="submit"
-                  className="w-full bg-primary text-white py-2 rounded"
-                  disabled={isLoading}
-                >
-                  {isLoading ? "Verifying..." : "Login"}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    className="flex-1 bg-primary text-white py-2 rounded"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? "Verifying..." : "Login"}
+                  </button>
+                  <button
+                    type="button"
+                    className="flex-1 border py-2 rounded"
+                    onClick={() => {
+                      setOtpSent(false);
+                      setOtp("");
+                    }}
+                    disabled={isLoading}
+                  >
+                    Change / Resend
+                  </button>
+                </div>
               </form>
             )}
-            <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                <Shield className="w-4 h-4" />
-                <span>Secured by Aadhaar Number & OTP</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                For demo purposes, OTP is mocked and login is allowed with any
-                12-digit Aadhaar number and 6-digit OTP.
-              </p>
+            <div className="mt-4 text-xs text-muted-foreground">
+              Backend logs OTP when SMS provider is not configured. Do not use
+              real Aadhaar without UIDAI authorization.
             </div>
           </CardContent>
         </Card>
