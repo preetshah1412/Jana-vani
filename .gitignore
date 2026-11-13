@@ -11,6 +11,14 @@ node_modules
 dist
 dist-ssr
 *.local
+**/.env
+!**/.env.example
+backend/community-polls.json
+backend/.ballot-key
+backend/authenticator-accounts.enc.json
+backend/runtime-state.enc.json
+backend/.jana-vani.instance.lock
+backend/*.tmp
 
 # Editor directories and files
 .vscode/*

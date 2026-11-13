@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+.git
+.env
+**/.env
+backend/community-polls.json
+backend/.ballot-key
+backend/authenticator-accounts.enc.json
+backend/runtime-state.enc.json
+backend/.jana-vani.instance.lock
+backend/*.tmp
+npm-debug.log*

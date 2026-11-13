@@ -1,0 +1,60 @@
+services:
+  jana-vani:
+    build: .
+    image: jana-vani:local
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    environment:
+      NODE_ENV: production
+      PORT: "8080"
+      HOST: 0.0.0.0
+      DATA_DIR: /data
+      PGHOST: database
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:-jana_vani}
+      PGUSER: ${POSTGRES_USER:-jana_vani}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      BALLOT_KEY: ${BALLOT_KEY:?Set BALLOT_KEY in .env}
+      IMPORT_FILE_DATA: "${IMPORT_FILE_DATA:-false}"
+      TRUST_PROXY_HOPS: "${TRUST_PROXY_HOPS:-0}"
+      FRONTEND_ORIGIN: "${FRONTEND_ORIGIN:-}"
+      COOKIE_SECURE: "${COOKIE_SECURE:-true}"
+    depends_on:
+      database:
+        condition: service_healthy
+    volumes:
+      - jana-vani-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/api/health/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  database:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-jana_vani}
+      POSTGRES_USER: ${POSTGRES_USER:-jana_vani}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - jana-vani-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  jana-vani-data:
+  jana-vani-postgres:

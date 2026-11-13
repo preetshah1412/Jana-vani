@@ -1,195 +1,144 @@
-# JANA-VANI: Secure Electronic Voting System
+# Jana Vani community voting prototype
 
-JANA-VANI is a blockchain-based secure voting platform designed for transparent, tamper-proof elections. It integrates voter ID validation, Aadhaar authentication, and captcha protection to ensure integrity and prevent fraud. Built with modern web technologies, it supports seamless user experience while maintaining voter privacy.
+Jana Vani is an independent local prototype for non-binding polls in housing societies/RWAs, student councils, clubs, associations, NGOs and community groups. It is not an official Indian election platform, is not authorised by the Election Commission of India or any State Election Commission, and is not suitable for public elections, legally binding decisions, real voter identity checks or sensitive votes.
 
-## Features
+## Run for local development
 
-- **Voter ID Validation**: Pre-voting authentication using unique 10-character alphanumeric Voter IDs to ensure only eligible voters participate.
-- **Captcha Protection**: Integrated captcha for new voter registrations to prevent bot attacks and automated abuse.
-- **Aadhaar Integration**: Secure linking of Voter IDs with Aadhaar database for identity verification without storing personal data.
-- **Pre-Voting Verification**: Multi-step process including Voter ID check, Aadhaar linkage (for new voters), and already-voted detection before accessing the ballot.
-- **Blockchain Voting**: Votes are recorded on an immutable blockchain for transparency and auditability.
-- **SMS Notifications**: Real-time alerts via AWS SNS for verification codes and voting confirmations.
-- **Duplicate Prevention**: Ensures one-time voting per Voter ID.
-- **Already Voted Detection**: Clear messaging and blocking for voters who have already cast their ballot.
-- **Cryptographic Hashing**: Deterministic SHA-256 hashing of vote data for verifiable receipts without revealing choices.
-- **Merkle Tree Verification**: Efficient proofs for batch vote validation and integrity checks.
-
-## Voter ID Validation System
-
-The Voter ID validation is the core security layer of JANA-VANI, ensuring only verified users can vote.
-
-### Pre-Voting Authentication
-- Users must enter a 10-character alphanumeric Voter ID (e.g., ABC1234567) before accessing candidate selection.
-- System checks if the Voter ID is valid, linked to Aadhaar, and not already used for voting.
-
-### Aadhaar Integration
-- For new voters, Voter ID is securely linked to Aadhaar via API calls.
-- No personal data is stored; only verification status is recorded.
-
-### Captcha Protection
-- During new voter registration or linkage, a captcha challenge prevents automated scripts.
-
-### Duplicate Prevention
-- Each Voter ID can only be used once for voting, enforced via database and blockchain checks.
-
-### Already Voted Detection
-- If a Voter ID has already voted, users see a message: "You have already cast your vote. Thank you for participating!"
-
-### Blockchain Verification
-- Voter ID validations are hashed and stored on the blockchain for immutable records and post-election audits.
-
-## Cryptographic & Blockchain Verification
-
-JANA-VANI uses advanced cryptography and blockchain for secure, verifiable voting.
-
-### Cryptographic Hashing
-- **Deterministic Vote Hashing**: Votes are canonicalized (sorted keys for objects) and hashed using SHA-256 to create unique, non-reversible receipts. This allows voters to verify their vote was recorded without revealing the choice.
-  - Example: `hash = SHA256(canonicalize({voterId: "ABC1234567", candidateId: "1", timestamp: 1234567890}))`
-- **Salt & Randomness**: Random hex salts added for session security where needed.
-
-### Merkle Trees
-- **Vote Aggregation**: Individual vote hashes are leaves in a Merkle tree. The root provides a compact commitment to all votes.
-- **Proof Generation & Verification**: For any vote, a Merkle proof (sibling hashes and positions) allows efficient verification against the root without revealing other votes.
-  - `verifyMerkleProof(leafHash, proof, root)` confirms inclusion.
-- **Use Case**: Post-election audits can verify specific votes belong to the official tally.
-
-### Blockchain Integration
-- **Smart Contract (Voting.sol)**: Deployed on Ethereum-compatible chain (local Hardhat for dev).
-  - Stores vote hashes and Voter IDs: `castVote(bytes32 voteHash, bytes32 voterId)`
-  - Validates: Voter ID must be pre-added and not used.
-  - Events: `VoteCast(address voter, bytes32 voteHash, bytes32 voterId)` for transparency.
-- **Ethers.js Client**: Backend connects via JsonRpcProvider to local node (http://127.0.0.1:8545).
-  - Signs and sends transactions with a wallet (mock private key).
-  - Retrieves receipts for confirmation.
-- **Flow**: Hash vote → Add Voter ID to contract → Cast on-chain → Store txHash in DB for verification.
-- **Immutability**: Once on-chain, votes cannot be altered; totalVotes counter provides aggregate verification.
-
-## Usage Guide
-
-### 3-Step Voting Process
-
-1. **Voter ID Verification**:
-   - Enter your 10-character Voter ID.
-   - System validates format and checks status (linked, new, already voted).
-
-2. **Aadhaar Authentication (for New Voters)**:
-   - If unlinked, provide Aadhaar details for secure verification.
-   - Complete captcha to confirm humanity.
-   - Receive SMS OTP for final linkage.
-
-3. **Casting a Vote**:
-   - After verification, select your candidate.
-   - Vote is hashed, submitted to blockchain, and confirmed.
-   - Receive hash receipt and txHash for personal verification.
-
-To run the project locally:
+Install the frontend and backend dependencies, then start both services:
 
 ```sh
-git clone <YOUR_GIT_URL>
-cd ballot-vault-protocol
-npm install
-# Install backend deps
-cd backend && npm install && cd ..
-# Install blockchain deps
-cd blockchain && npm install && npx hardhat compile && cd ..
-# Start blockchain node
-cd blockchain && npx hardhat node & cd ..
-# Start backend
-cd backend && npm start & cd ..
-npm run dev  # Frontend
+npm ci
+cd backend && npm ci && cd ..
+npm run dev:all
 ```
 
-**Note**: Add test Voter IDs to contract via owner wallet. Install ethers: `cd backend && npm i ethers`
+Open `http://localhost:8080`. The frontend listens on port 8080 and the backend on port 4000. Stop both with Ctrl+C.
 
-## API Documentation
+## Build and run as a single service
 
-The backend API handles authentication, voting, and verification.
+With Node.js 22 installed and dependencies available:
 
-### Endpoints
+```sh
+npm ci
+cd backend && npm ci --omit=dev && cd ..
+npm run build
+```
 
-- **GET /api/check-voter**
-  - Check voter status by Voter ID.
-  - Request: `?voterId=ABC1234567`
-  - Response: `{ "status": "valid_linked" | "new" | "already_voted" | "invalid" }`
+Set `NODE_ENV=production`, `PORT=8080`, `DATA_DIR`, PostgreSQL connection settings (`DATABASE_URL` or `PGHOST`/`PGPORT`/`PGDATABASE`/`PGUSER`/`PGPASSWORD`), and a `BALLOT_KEY` shared by all app instances, then run `npm start`. The backend serves the built frontend and API from one origin. Put it behind HTTPS before exposing it beyond a trusted local network; production cookies require HTTPS.
 
-- **POST /api/link-voter-aadhaar**
-  - Link Voter ID with Aadhaar.
-  - Request: `{ "voterId": "ABC1234567", "aadhaarNumber": "123456789012", "captcha": "solution" }`
-  - Response: `{ "success": true, "message": "Linked successfully" }`
+## Run with Docker Compose
 
-- **POST /api/vote/cast**
-  - Cast a vote (updated with Voter ID parameter).
-  - Request: `{ "voterId": "ABC1234567", "candidateId": "1" }`
-  - Response: `{ "success": true, "receipt": "0xabc...", "txHash": "0xdef..." }`
+With Docker installed, copy `.env.example` to `.env`, then set a strong `POSTGRES_PASSWORD` and a 64-character hexadecimal `BALLOT_KEY`. Generate a key with `node -p "require('crypto').randomBytes(32).toString('hex')"`; keep it in a protected secret store and use the same key for every app instance. For an existing file-based deployment, set `BALLOT_KEY` to its current `.ballot-key` value and set `IMPORT_FILE_DATA=true` for the first successful startup only; then set it back to `false`. New installations should leave it `false`.
 
-- **POST /api/aadhaar/initiate**
-  - Send OTP to Aadhaar.
-  - Request: `{ "aadhaarNumber": "123456789012" }`
-  - Response: `{ "success": true, "message": "OTP sent" }`
+```sh
+cp .env.example .env
+docker compose up --build -d
+```
 
-- **POST /api/aadhaar/verify**
-  - Verify OTP.
-  - Request: `{ "aadhaarNumber": "123456789012", "otp": "123456" }`
-  - Response: `{ "success": true, "message": "Verified" }`
+Open `http://localhost:8080` for a local preview. Cookies are `Secure` by default in the production container; for local HTTP only, change `COOKIE_SECURE=false` in `.env` before starting Compose. Do not use that setting on a public deployment. Compose runs a persistent PostgreSQL service and the app container as a non-root user with a read-only filesystem and health checks. On first database setup, the app imports existing local data only when `IMPORT_FILE_DATA=true`; it refuses to silently re-import old files if an initialized database later loses its state row. In PostgreSQL mode, app instances coordinate through a transaction-locked shared state row; all API requests are serialized, so this is intended for low-volume community demonstrations and is not a high-throughput election platform. For a public deployment, terminate HTTPS at a trusted reverse proxy. If the app is behind exactly one trusted proxy, set `TRUST_PROXY_HOPS=1`; only set this to match your actual proxy chain.
 
-- **GET /api/vote/verify/:hash**
-  - Verify vote hash (DB + blockchain check).
-  - Response: `{ "success": true, "vote": { "candidateId": "1", "date": "..." }, "blockchainVerified": true }`
+## Back up and verify demo data
 
-All endpoints use JSON and require HTTPS in production.
+The local file backup command copies poll data, encrypted authenticator accounts and runtime security state, and the ballot key into one timestamped folder. Stop the app before creating this file snapshot so its files represent one consistent point in time. The PostgreSQL backup uses `pg_dump` and can run while the app is online. Protect backups and `BALLOT_KEY` like credentials, store copies away from the server, and periodically verify them.
 
-## Testing
+For a local file-based development run, stop the development server with Ctrl+C, then run:
 
-### Pre-configured Test Voter IDs
+```powershell
+$backupRoot = Join-Path $PWD "jana-vani-backups"
+New-Item -ItemType Directory -Force $backupRoot | Out-Null
+npm run backup:data -- create $backupRoot .\backend
+```
 
-- **Valid Linked**: ABC1234567, XYZ9876543, VOTER0001, VOTER0002, VOTER0003
-- **New Voters**: Any 10-character alphanumeric ID (e.g., TESTVOTER01)
-- **Invalid**: Wrong format (e.g., ABC, 1234567890A)
+Use the folder path printed by the command to verify the backup:
 
-### Test Scenarios
+```powershell
+npm run backup:data -- verify "<printed-backup-folder>"
+```
 
-- **Already Voted**: Use ABC1234567 after simulating a vote → Expect "already_voted" status.
-- **Valid Linked**: Use XYZ9876543 → Proceeds to voting.
-- **New Voter**: Use TESTVOTER01 → Prompts for Aadhaar linkage and captcha.
-- **Invalid Format**: Use INVALID → Returns error.
-- **Blockchain Verification**: After vote, check /api/vote/verify/:hash for tx confirmation.
-- **Merkle Proof**: Manually test utils/merkle.js with sample leaves.
+If the server uses a custom `DATA_DIR`, pass that exact data directory instead of `backend`.
 
-Run tests:
-- Frontend: `npm run test` (if configured).
-- Backend: `cd backend && npm test`.
-- Blockchain: `cd blockchain && npx hardhat test`.
+For the Docker Compose PostgreSQL deployment, make an online database snapshot with:
 
-## Security Features
+```powershell
+npm run backup:database -- create .\jana-vani-backups
+```
 
-- **Voter ID Privacy**: Validation performed without storing full personal data; only hashes are retained.
-- **Captcha Security**: Mock reCAPTCHA integration for bot prevention during sensitive operations.
-- **Enhanced Privacy Protection**: End-to-end encryption for votes, Aadhaar verification via secure APIs, and no logs of personal info.
-- **Cryptographic Security**: SHA-256 for hashes, canonicalization prevents malleability attacks.
-- **Blockchain Immutability**: All votes and validations are tamper-proof via smart contract.
-- **Merkle Proofs**: Scalable verification without full disclosure.
-- **SMS Security**: OTPs sent via AWS SNS with rate limiting.
+Verify it with the dump-file path printed by the command:
 
-## Technologies Used
+```powershell
+npm run backup:database -- verify "<printed-dump-file>"
+```
 
-This project is built with:
+Restore a verified dump into a newly named database without replacing the active one:
 
-- **Frontend**: Vite, TypeScript, React, shadcn-ui, Tailwind CSS, Axios
-- **Backend**: Node.js, Express, MongoDB (via Mongoose models), Crypto (built-in)
-- **Blockchain**: Hardhat, Solidity (Voting.sol contract), Ethereum-compatible, Ethers.js
-- **Integrations**: AWS SNS for SMS, Aadhaar API (mocked for testing)
-- **Security**: Crypto utilities (SHA-256 hashing), Merkle trees for vote aggregation, Ethers for tx signing
-- **Tools**: ESLint, PostCSS
+```powershell
+npm run restore:database -- "<printed-dump-file>"
+```
 
-## Documentation Highlights
+After reviewing the restored database, copy the printed database name into `POSTGRES_DB` in `.env` and run `docker compose up -d` to switch the app. Keep the same `BALLOT_KEY` used for the backup; the restore tool never changes the active database automatically.
 
-- **Complete User Flow**: Step-by-step from Voter ID entry to vote confirmation.
-- **API Reference**: All endpoints with examples above.
-- **Testing Guide**: Specific scenarios and test data provided.
-- **Security Overview**: Privacy-focused validation layers.
-- **Architecture Details**: Frontend handles UI/UX, backend manages API/verification/hash gen, blockchain ensures integrity via contracts.
+The local file backup tool and PostgreSQL backup tool are separate. A PostgreSQL dump does not contain `BALLOT_KEY`; store that key separately in an access-controlled secret manager. A checksum can detect accidental backup damage but does not replace a restore procedure or an off-site copy.
 
-For contributions, see CONTRIBUTING.md (create if needed). Report issues via GitHub.
+The app removes its instance lock during a normal file-based shutdown. After a forced kill or machine crash, `.jana-vani.instance.lock` may remain in `DATA_DIR` and block startup. Remove that file only after confirming that no Jana Vani process is using the data directory.
 
-🗳️ Powered by Blockchain for Fair Elections!
+## Sign in with Google Authenticator
+
+1. Enter `DEMO000001` or create a made-up code beginning with `DEMO` followed by six characters. Do not enter an EPIC/Voter ID, Aadhaar number, or phone number.
+2. On first use, scan the setup QR code with Google Authenticator.
+3. Enter the current six-digit code to complete enrollment and sign in.
+4. Each vote submission also asks for the current six-digit code.
+
+Authenticator secrets and runtime security state are encrypted at rest with AES-256-GCM. Runtime state includes hashed session tokens, session expiry times, and rate-limit counters. Sessions can remain valid across an app restart until logout or their eight-hour expiry. A random key is created in `DATA_DIR` on first start unless `BALLOT_KEY` is supplied. Keep the key with protected backups; changing or losing the key prevents decryption. Demo codes are not linked to a person or checked against an official electoral roll.
+
+## Community polls and receipts
+
+- Signed-in users can create a group poll (housing society/RWA, student council, club/association, NGO/community group or local issue) with up to 20 options and an opening and closing date. All dates use India Standard Time.
+- A signed-in demo account can cast one vote per poll. The server verifies a single-use TOTP code before recording it.
+- In local development, poll data is saved in `community-polls.json`; authenticator accounts and runtime state are encrypted in files under `DATA_DIR`.
+- Docker Compose stores poll data, authenticator accounts, sessions, and rate limits in PostgreSQL. A one-time import from existing local files requires `IMPORT_FILE_DATA=true` on initial database creation.
+- Each ballot gets a random secret and a SHA-256 commitment to the poll ID, option ID, and secret. The choice and secret are returned in a private receipt that can be saved locally.
+- Only the commitment is written to the local hash chain. The voter can recompute their commitment from the private receipt; other people cannot infer the selected option from the commitment alone.
+- `/api/receipts/:commitment` checks that the commitment is in the ledger and that the local chain links are intact. This is a centralized local hash-chain demonstration, not a decentralized blockchain or independent proof of a real election.
+- `GET /api/ledger/export` returns public commitment blocks and poll labels without voter nullifiers or receipt secrets. Save the JSON and run `npm run verify:ledger -- <export-file>` to recompute its internal chain hashes offline.
+- Aggregate poll results are available after the poll closes.
+
+The offline verifier detects broken links, changed block contents, duplicate commitments, and an inconsistent exported head hash. It cannot tell whether the server omitted later blocks before export, prove that totals were counted correctly, or verify voter eligibility. Share a ledger head hash through a separate trusted channel if you want other reviewers to compare snapshots over time.
+
+The confirmation screen now hides the choice until the voter asks to reveal it. This only reduces accidental disclosure on screen: the full receipt still contains the choice and its random secret, and anyone who gets it can see the recorded selection. The hash does not let a voter recover their selection; the private receipt carries that information. This is not a coercion-resistant receipt system.
+
+## Phone, SMS, and Aadhaar
+
+This prototype does not send SMS and does not collect or authenticate Aadhaar or EPIC/Voter ID numbers. Official voter services are available through the [Election Commission of India Voters’ Service Portal](https://voters.eci.gov.in/). Aadhaar authentication is provided only through UIDAI’s requesting-entity framework; do not add Aadhaar numbers or real phone numbers to this demo.
+
+For public elections, use the responsible election authority: the ECI administers Parliament and State Legislature elections; the Constitution assigns Panchayat and Municipal election processes to State Election Commissions. This prototype does not administer or certify any such election. See the [ECI portal](https://voters.eci.gov.in/) and the [Constitution of India, Articles 243K and 243ZA](https://www.legislative.gov.in/static/uploads/2025/07/88cca69e868e50b217f855be2fb8bdba.pdf).
+
+## Prototype limitations
+
+- There are no organizer roles; any signed-in demo user may create or close a poll.
+- TOTP secrets and runtime security state are encrypted at rest, but there is no lost-device recovery or key-rotation workflow. Runtime state persists across restarts but remains a local file that multiple app instances do not share or coordinate.
+- Ballots are centrally processed by this server. The duplicate-vote marker and aggregate tally are not a cryptographically anonymous, independently audited voting system.
+- The demo ledger is a local file-backed hash chain with no distributed consensus or external witnesses. Server or file compromise can alter the data. The app now pauses new votes and withholds results when it detects a broken chain or a mismatch between ballot records and commitments, but this check cannot detect a coordinated rewrite of the server data or validate the tally independently.
+- Local file mode uses an exclusive single-instance lock. Compose mode stores shared app state in one PostgreSQL JSONB row and serializes API requests; it supports coordination across app processes for small demonstrations, but the single database remains a point of failure and throughput bottleneck.
+- Deployment has no automatic off-site backup, database replication, or failover. A dump can be restored into a separate database, but the operator must review it and switch the app manually; protect the PostgreSQL dump and `BALLOT_KEY` separately.
+- There is no official voter registry, legally approved election process, independent security audit, or election-grade operational control.
+
+The election list and detail APIs currently include per-option vote counts before a poll closes, even though the dedicated results page is intended for completed polls. Live totals should therefore be treated as visible. Do not use this prototype where interim tally confidentiality matters.
+
+## Project documentation
+
+- [User guide](docs/USER_GUIDE.md): sign-in, poll creation, voting, receipts, and results.
+- [Architecture](docs/ARCHITECTURE.md): request flow, storage, TOTP, commitments, and the local hash chain.
+- [Security model](docs/SECURITY.md): implemented controls, assumptions, operational handling, and limitations.
+- [API reference](docs/API.md): routes, authentication, request fields, and response statuses.
+- [Deployment and operations](docs/DEPLOYMENT.md): local/Compose setup, environment settings, backups, and restore.
+- [Expanded IEEE-style research paper](Jana_Vani_IEEE_Research_Paper_Expanded.docx): implementation study and related work (2025–2026).
+
+## API overview
+
+- `GET /api/health` — liveness status.
+- `GET /api/health/ready` — readiness status, including access to the persistent data directory.
+- `POST /api/auth/setup` and `POST /api/auth/verify` accept a made-up `demoCode`; never send a real Indian identity number. `GET /api/auth/session` and `POST /api/auth/logout` manage the demo session.
+- `GET /api/elections`, `POST /api/elections`, `GET /api/elections/:id`, `POST /api/elections/:id/close` — community poll management.
+- `POST /api/votes` — submit a choice with the current authenticator code.
+- `GET /api/receipts/:commitment` — verify a commitment’s presence and local hash-chain integrity.
+- `GET /api/elections/:id/results` — poll totals and latest commitment block hash.
