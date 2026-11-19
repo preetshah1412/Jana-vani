@@ -930,12 +930,13 @@ app.get('/api/elections/:id/results', (req, res) => {
 
 app.use('/api', (_req, res) => res.status(404).json({ message: 'API endpoint not found.' }));
 
+const isVercelRuntime = Boolean(process.env.VERCEL);
 const webRoot = path.join(__dirname, '..', 'dist');
 const indexFile = path.join(webRoot, 'index.html');
-if (isProduction && !fs.existsSync(indexFile)) {
+if (isProduction && !isVercelRuntime && !fs.existsSync(indexFile)) {
   throw new Error('Production frontend build is missing. Run `npm run build` before starting the server.');
 }
-if (fs.existsSync(indexFile)) {
+if (!isVercelRuntime && fs.existsSync(indexFile)) {
   app.use(express.static(webRoot, {
     index: false,
     maxAge: '1h',

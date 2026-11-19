@@ -28,6 +28,21 @@ npm start
 
 Compose enables secure cookies by default. `COOKIE_SECURE=false` is only for local HTTP previews and must not be used on an exposed deployment. Before remote access, put the app behind HTTPS. Set `TRUST_PROXY_HOPS` to the actual number of trusted reverse proxies; do not trust arbitrary forwarded headers.
 
+## Vercel multi-service deployment
+
+The repository includes a `vercel.json` that routes the Vite website to the `web` service and `/api/*` requests to the Express `api` service. Vercel Services is in beta, so this deployment path depends on Services being enabled for the Vercel account. Import the repository as a multi-service project; do not import only the `web` or `api` subproject.
+
+Before the first deployment, attach a PostgreSQL database with a pooled connection URL and configure these production environment variables for the API service:
+
+| Variable | Value |
+| --- | --- |
+| `DATABASE_URL` | Pooled PostgreSQL connection URL from the database provider. |
+| `BALLOT_KEY` | 32 random bytes encoded as exactly 64 hexadecimal characters. Generate it once and keep it secret and backed up. |
+| `DATA_DIR` | `/tmp/jana-vani`; in database mode, application data is persisted in PostgreSQL. |
+| `TRUST_PROXY_HOPS` | `1` for the Vercel edge proxy. |
+
+Keep secure cookies enabled; Vercel supplies HTTPS. The API intentionally fails to start without `DATABASE_URL` and `BALLOT_KEY`. Do not use file storage for deployment because serverless instance files are not durable or shared. After deployment, verify `/api/health/ready`, sign-in, poll creation, and the API routing before sharing the preview URL. This remains a low-volume demonstration, not an official or binding election service.
+
 ## Environment settings
 
 | Setting | Required use |
